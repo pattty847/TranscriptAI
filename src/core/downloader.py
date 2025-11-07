@@ -23,8 +23,21 @@ class DownloadProgress:
 
 class UniversalDownloader:
     def __init__(self, output_dir: Optional[Path] = None):
-        self.output_dir = output_dir or Path.cwd()
-        self.output_dir.mkdir(exist_ok=True)
+        if output_dir is None:
+            # Create organized folder structure
+            base_dir = Path.cwd()
+            self.downloads_dir = base_dir / "downloads" / "videos"
+            self.transcripts_dir = base_dir / "downloads" / "transcripts"
+        else:
+            self.downloads_dir = output_dir / "videos"
+            self.transcripts_dir = output_dir / "transcripts"
+            
+        # Create directories
+        self.downloads_dir.mkdir(parents=True, exist_ok=True)
+        self.transcripts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Keep the old output_dir for backwards compatibility
+        self.output_dir = self.downloads_dir
         
     def _progress_hook(self, d, callback: Optional[Callable[[DownloadProgress], None]] = None):
         """Progress callback for yt-dlp"""

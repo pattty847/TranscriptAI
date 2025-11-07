@@ -24,12 +24,14 @@ class DownloadWorker(QThread):
     completed = Signal(Path, str)  # (file_path, transcript_text)
     error_occurred = Signal(str)  # Error message
     
-    def __init__(self, url: str, model: str = "medium.en"):
+    def __init__(self, url: str, model: str = "medium.en", download_only: bool = False, keep_video: bool = False):
         super().__init__()
         self.url = url
         self.model = model
+        self.download_only = download_only
+        self.keep_video = keep_video
         self.downloader = UniversalDownloader()
-        self.transcriber = WhisperTranscriber(model)
+        self.transcriber = WhisperTranscriber(model) if not download_only else None
         
     def run(self):
         """Run the download and transcription process"""
@@ -59,21 +61,34 @@ class DownloadWorker(QThread):
                 
             video_path = await self.downloader.download(self.url, download_callback)
             self.progress_updated.emit(f"Download completed: {video_path.name}")
-            
-            # Transcription phase
-            self.progress_updated.emit("Starting transcription...")
             self.download_progress.emit(100.0)  # Download done
             
-            def transcription_callback(progress: TranscriptionProgress):
-                self.transcription_progress.emit(progress.percent)
-                self.progress_updated.emit(str(progress))
+            if self.download_only:
+                # Download only - skip transcription
+                self.progress_updated.emit("Download completed! (Transcription skipped)")
+                self.completed.emit(video_path, "")  # Empty transcript
+            else:
+                # Transcription phase
+                self.progress_updated.emit("Starting transcription...")
                 
-            transcript, transcript_path = await self.transcriber.transcribe_and_save(
-                video_path, progress_callback=transcription_callback
-            )
-            
-            self.progress_updated.emit(f"Transcription completed: {transcript_path.name}")
-            self.completed.emit(transcript_path, transcript)
+                def transcription_callback(progress: TranscriptionProgress):
+                    self.transcription_progress.emit(progress.percent)
+                    self.progress_updated.emit(str(progress))
+                    
+                transcript, transcript_path = await self.transcriber.transcribe_and_save(
+                    video_path, transcripts_dir=self.downloader.transcripts_dir, progress_callback=transcription_callback
+                )
+                
+                self.progress_updated.emit(f"Transcription completed: {transcript_path.name}")
+                self.completed.emit(transcript_path, transcript)
+                
+                # Clean up video if not keeping it
+                if not self.keep_video:
+                    try:
+                        video_path.unlink()
+                        self.progress_updated.emit(f"Removed video file: {video_path.name}")
+                    except Exception:
+                        pass  # Ignore cleanup errors
             
         except Exception as e:
             self.error_occurred.emit(f"Process failed: {str(e)}")
@@ -96,6 +111,10 @@ class DownloadTab(QWidget):
         # Input section
         input_group = self.create_input_section()
         layout.addWidget(input_group)
+        
+        # Folder info section
+        folder_group = self.create_folder_info_section()
+        layout.addWidget(folder_group)
         
         # Progress section
         progress_group = self.create_progress_section()
@@ -138,14 +157,21 @@ class DownloadTab(QWidget):
         ])
         self.model_combo.setCurrentText("medium.en")
         
-        # Keep video checkbox
+        # Options checkboxes
         self.keep_video_check = QCheckBox("Keep video file")
         self.keep_video_check.setChecked(False)
+        
+        self.download_only_check = QCheckBox("Download only (skip transcription)")
+        self.download_only_check.setChecked(False)
+        
+        # Connect download_only checkbox to disable keep_video when download-only is selected
+        self.download_only_check.toggled.connect(self.on_download_only_changed)
         
         settings_layout.addWidget(model_label)
         settings_layout.addWidget(self.model_combo)
         settings_layout.addStretch()
         settings_layout.addWidget(self.keep_video_check)
+        settings_layout.addWidget(self.download_only_check)
         
         layout.addLayout(settings_layout)
         
@@ -164,6 +190,31 @@ class DownloadTab(QWidget):
         button_layout.addStretch()
         
         layout.addLayout(button_layout)
+        
+        return group
+        
+    def create_folder_info_section(self) -> QGroupBox:
+        """Create folder information section"""
+        group = QGroupBox("Output Folders")
+        layout = QVBoxLayout(group)
+        
+        # Videos folder
+        videos_layout = QHBoxLayout()
+        videos_layout.addWidget(QLabel("Videos:"))
+        self.videos_path_label = QLabel("downloads/videos/")
+        self.videos_path_label.setStyleSheet("QLabel { color: #0d7377; font-family: monospace; }")
+        videos_layout.addWidget(self.videos_path_label)
+        videos_layout.addStretch()
+        layout.addLayout(videos_layout)
+        
+        # Transcripts folder  
+        transcripts_layout = QHBoxLayout()
+        transcripts_layout.addWidget(QLabel("Transcripts:"))
+        self.transcripts_path_label = QLabel("downloads/transcripts/")
+        self.transcripts_path_label.setStyleSheet("QLabel { color: #0d7377; font-family: monospace; }")
+        transcripts_layout.addWidget(self.transcripts_path_label)
+        transcripts_layout.addStretch()
+        layout.addLayout(transcripts_layout)
         
         return group
         
@@ -222,11 +273,16 @@ class DownloadTab(QWidget):
             self.add_log("❌ Process already running")
             return
             
+        # Get settings first
+        model = self.model_combo.currentText()
+        download_only = self.download_only_check.isChecked()
+        keep_video = self.keep_video_check.isChecked()
+            
         # Reset UI
         self.download_progress.setValue(0)
         self.transcription_progress.setValue(0)
         self.download_progress.setVisible(True)
-        self.transcription_progress.setVisible(True)
+        self.transcription_progress.setVisible(not download_only)  # Hide if download-only
         
         # Disable start button
         self.start_button.setEnabled(False)
@@ -235,9 +291,7 @@ class DownloadTab(QWidget):
         # Clear log
         self.log_output.clear()
         
-        # Start worker
-        model = self.model_combo.currentText()
-        self.worker = DownloadWorker(url, model)
+        self.worker = DownloadWorker(url, model, download_only, keep_video)
         
         # Connect signals
         self.worker.progress_updated.connect(self.update_status)
@@ -271,13 +325,32 @@ class DownloadTab(QWidget):
         """Add message to log output"""
         self.log_output.append(message)
         
+    def on_download_only_changed(self, checked: bool):
+        """Handle download-only checkbox changes"""
+        if checked:
+            # Disable keep_video when download-only is selected (it's always kept)
+            self.keep_video_check.setEnabled(False)
+            self.keep_video_check.setChecked(True)  # Auto-check since we always keep in download-only
+            self.keep_video_check.setText("Keep video file (always enabled)")
+        else:
+            # Re-enable keep_video when transcription is enabled
+            self.keep_video_check.setEnabled(True)
+            self.keep_video_check.setChecked(False)  # Default to false
+            self.keep_video_check.setText("Keep video file")
+            
     def on_completed(self, file_path: Path, transcript_text: str):
         """Handle successful completion"""
-        self.add_log(f"✅ Process completed successfully!")
-        self.add_log(f"📄 Transcript saved to: {file_path}")
+        is_download_only = self.download_only_check.isChecked()
         
-        # Emit signal for main window
-        self.transcription_completed.emit(file_path, transcript_text)
+        if is_download_only:
+            self.add_log(f"✅ Download completed successfully!")
+            self.add_log(f"📹 Video saved to: {file_path}")
+            # Don't emit transcription_completed signal for download-only
+        else:
+            self.add_log(f"✅ Process completed successfully!")
+            self.add_log(f"📄 Transcript saved to: {file_path}")
+            # Only emit signal if we have a transcript (auto-navigate to analysis)
+            self.transcription_completed.emit(file_path, transcript_text)
         
     def on_error(self, error_message: str):
         """Handle error"""

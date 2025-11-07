@@ -80,13 +80,17 @@ class WhisperTranscriber:
         except Exception as e:
             raise Exception(f"Transcription failed: {str(e)}")
 
-    async def transcribe_and_save(self, audio_path: Path, output_path: Optional[Path] = None, progress_callback: Optional[Callable[[TranscriptionProgress], None]] = None) -> tuple[str, Path]:
+    async def transcribe_and_save(self, audio_path: Path, output_path: Optional[Path] = None, transcripts_dir: Optional[Path] = None, progress_callback: Optional[Callable[[TranscriptionProgress], None]] = None) -> tuple[str, Path]:
         """Transcribe and save to file, returns (transcript_text, output_file_path)"""
         
         transcript = await self.transcribe(audio_path, progress_callback)
         
         if output_path is None:
-            output_path = audio_path.with_suffix('.txt')
+            # Save to organized transcripts directory
+            if transcripts_dir:
+                output_path = transcripts_dir / f"{audio_path.stem}.txt"
+            else:
+                output_path = audio_path.with_suffix('.txt')
             
         progress = TranscriptionProgress()
         progress.stage = "saving"
