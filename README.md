@@ -2,6 +2,9 @@
 
 A sleek, modern desktop app for downloading, transcribing, and AI-analyzing video content.
 
+<img width="1398" height="927" alt="image" src="https://github.com/user-attachments/assets/f2cdd910-e482-4429-a991-7e358876f66c" />
+
+
 ## Features
 - **Download & Transcribe**: Any video/audio URL → text with Whisper AI
 - **AI Analysis**: Local LLM analysis via Ollama
