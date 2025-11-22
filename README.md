@@ -14,7 +14,7 @@
 
 | Download & Transcribe | AI Analysis |
 |:---:|:---:|
-| <img src="https://github.com/user-attachments/assets/placeholder-image-1" alt="Download Tab" width="100%"/> | <img src="https://github.com/user-attachments/assets/placeholder-image-2" alt="Analysis Tab" width="100%"/> |
+| <img width="1396" height="929" alt="Main Window" src="https://github.com/user-attachments/assets/db3ff6b8-d4de-4a0e-a355-d56ef7958489" /> | <img width="1397" height="926" alt="Analyze with AI" src="https://github.com/user-attachments/assets/ee46ea0d-abe0-4a03-9030-12f79cf0c1c8" /> |
 
 *Modern tabbed interface with real-time progress tracking and intuitive controls*
 
