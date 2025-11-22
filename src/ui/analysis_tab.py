@@ -8,7 +8,7 @@ from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, 
     QPushButton, QGroupBox, QComboBox, QLineEdit, QSplitter,
-    QProgressBar, QTabWidget, QScrollArea, QFrame
+    QProgressBar, QTabWidget, QScrollArea, QFrame, QApplication
 )
 
 from src.core.analyzer import OllamaAnalyzer, AnalysisResult
@@ -125,6 +125,22 @@ class AnalysisTab(QWidget):
         
         layout.addLayout(controls_layout)
         
+        # Transcript section with copy button
+        transcript_header_layout = QHBoxLayout()
+        transcript_label = QLabel("Transcript:")
+        transcript_label.setStyleSheet("QLabel { font-weight: bold; }")
+        transcript_header_layout.addWidget(transcript_label)
+        transcript_header_layout.addStretch()
+        
+        # Copy button
+        self.copy_transcript_btn = QPushButton("📋 Copy Transcript")
+        self.copy_transcript_btn.setToolTip("Copy transcript text to clipboard")
+        self.copy_transcript_btn.clicked.connect(self.copy_transcript_to_clipboard)
+        self.copy_transcript_btn.setEnabled(False)  # Disabled until transcript is loaded
+        transcript_header_layout.addWidget(self.copy_transcript_btn)
+        
+        layout.addLayout(transcript_header_layout)
+        
         # Transcript display
         self.transcript_display = QTextEdit()
         self.transcript_display.setPlaceholderText("Transcript will appear here after download and transcription...")
@@ -210,7 +226,17 @@ class AnalysisTab(QWidget):
         self.transcript_display.setPlainText(transcript)
         self.analyze_button.setEnabled(True)
         self.custom_analyze_button.setEnabled(True)
+        self.copy_transcript_btn.setEnabled(True)  # Enable copy button
         self.status_label.setText(f"Transcript loaded ({len(transcript)} characters). Ready for analysis.")
+    
+    def copy_transcript_to_clipboard(self):
+        """Copy transcript text to clipboard"""
+        if not self.current_transcript:
+            return
+        
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.current_transcript)
+        self.status_label.setText(f"📋 Transcript copied to clipboard! ({len(self.current_transcript)} characters)")
         
     def start_analysis(self):
         """Start AI analysis"""

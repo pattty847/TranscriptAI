@@ -17,11 +17,14 @@ from src.ui.styles import DARK_THEME
 from src.ui.download_tab import DownloadTab
 from src.ui.analysis_tab import AnalysisTab
 from src.ui.results_tab import ResultsTab
+from src.config.paths import ProjectPaths
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Initialize folder structure
+        ProjectPaths.initialize()
         self.setup_ui()
         self.setup_theme()
         

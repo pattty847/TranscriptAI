@@ -22,11 +22,14 @@ TranscriptAI is a modern desktop application for downloading videos from 1000+ w
 
 ### Key Features
 - **Universal Video Download**: yt-dlp supports YouTube, TikTok, Twitter, Vimeo, etc.
-- **GPU-Accelerated Transcription**: CUDA-optimized Whisper AI
+- **Local File Processing**: Browse and process local video files directly
+- **Mixed Input Support**: Process URLs and local files simultaneously
+- **GPU-Accelerated Transcription**: CUDA-optimized Whisper AI with real-time progress tracking
 - **Local AI Analysis**: Privacy-first analysis using Ollama
-- **Modern UI**: Dark-themed PySide6 interface
-- **Organized Storage**: Automatic folder organization
+- **Modern UI**: Dark-themed PySide6 interface with intuitive controls
+- **Organized Storage**: Centralized assets/ folder structure
 - **Flexible Workflows**: Download-only or full transcription+analysis
+- **Smart File Management**: Copy files to assets/ or process in-place
 
 ### Tech Stack
 - **Backend**: Python 3.12, AsyncIO for non-blocking operations
@@ -77,12 +80,90 @@ TranscriptAI is a modern desktop application for downloading videos from 1000+ w
 
 ## 🔧 Core Components
 
-### 1. UniversalDownloader (`src/core/downloader.py`)
+### 1. ProjectPaths (`src/config/paths.py`)
+
+**Purpose**: Centralized path management for all application directories
+
+**Key Features**:
+- Unified assets/ folder structure (replaces old downloads/)
+- Automatic directory creation
+- Cleanup of old folder structure on startup
+- Cross-platform path handling
+
+**Usage**:
+```python
+from src.config.paths import ProjectPaths
+
+ProjectPaths.initialize()  # Call on app startup
+video_path = ProjectPaths.VIDEOS_DIR / "video.mp4"
+```
+
+**Key Properties**:
+- `VIDEOS_DIR`: `assets/videos/` - Downloaded videos
+- `TRANSCRIPTS_DIR`: `assets/transcripts/` - Generated transcripts
+- `ANALYSIS_DIR`: `assets/analysis/` - Future analysis results
+
+### 2. InputProcessor (`src/core/input_processor.py`)
+
+**Purpose**: Detect, validate, and parse mixed input (URLs + file paths)
+
+**Key Features**:
+- Automatic input type detection (URL vs file path)
+- Support for multiple inputs separated by semicolons or newlines
+- File existence and format validation
+- Video extension checking
+
+**Usage**:
+```python
+from src.core.input_processor import InputProcessor
+
+items = InputProcessor.parse_mixed_input("https://youtube.com/watch?v=abc; C:/videos/file.mp4")
+# Returns: {"urls": ["https://..."], "files": ["C:/videos/file.mp4"], "invalid": []}
+```
+
+**Key Methods**:
+- `detect_input_type()`: Determine if input is URL, file, or invalid
+- `parse_mixed_input()`: Parse and categorize multiple inputs
+- `validate_files()`: Verify file paths exist and are video files
+
+### 3. UnifiedProcessor (`src/core/processor.py`)
+
+**Purpose**: Unified processing pipeline for URLs and local files
+
+**Key Features**:
+- Handles both URLs (download) and local files (copy or in-place)
+- Sequential processing queue with status tracking
+- Smart transcript filename generation
+- Progress tracking for all operations
+
+**Usage**:
+```python
+from src.core.processor import UnifiedProcessor
+
+processor = UnifiedProcessor(model="medium.en", copy_files=True)
+results = await processor.process_mixed_input(
+    input_text,
+    progress_callback=...,
+    download_progress_callback=...,
+    transcription_progress_callback=...
+)
+```
+
+**Key Classes**:
+- `ProcessingItem`: Represents a single item in the processing queue
+- `UnifiedProcessor`: Main processor class
+
+**Key Methods**:
+- `process_mixed_input()`: Process URLs and files from mixed input
+- `process_single_item()`: Process individual URL or file
+- `generate_transcript_filename()`: Create clean, unique transcript filenames
+
+### 4. UniversalDownloader (`src/core/downloader.py`)
 
 **Purpose**: Download videos from any supported website using yt-dlp
 
 **Key Features**:
-- Organized folder structure (`downloads/videos/`, `downloads/transcripts/`)
+- Uses `ProjectPaths.VIDEOS_DIR` for organized storage
 - Real-time progress tracking via callbacks
 - ANSI color code sanitization for Windows compatibility
 - Robust error handling
@@ -97,28 +178,34 @@ video_path = await downloader.download(url, progress_callback)
 - `download()`: Main download method with progress tracking
 - `_progress_hook()`: Parses yt-dlp progress and sanitizes data
 
-### 2. WhisperTranscriber (`src/core/transcriber.py`)
+### 5. WhisperTranscriber (`src/core/transcriber.py`)
 
 **Purpose**: GPU-accelerated audio transcription using OpenAI Whisper
 
 **Key Features**:
 - CUDA acceleration for RTX GPUs
 - Multiple model sizes (tiny.en to large-v3)
-- Organized transcript storage
-- Progress tracking for loading and transcription phases
+- Real-time progress tracking via time-based estimation
+- Audio duration detection using ffprobe
+- Uses `ProjectPaths.TRANSCRIPTS_DIR` for storage
 
 **Usage**:
 ```python
 transcriber = WhisperTranscriber(model="medium.en", device="cuda")
-transcript, path = await transcriber.transcribe_and_save(video_path, transcripts_dir=transcripts_dir)
+transcript, path = await transcriber.transcribe_and_save(
+    video_path, 
+    transcripts_dir=ProjectPaths.TRANSCRIPTS_DIR,
+    progress_callback=progress_callback
+)
 ```
 
 **Key Methods**:
 - `load_model()`: Async model loading with progress
-- `transcribe()`: Core transcription method
+- `transcribe()`: Core transcription method with progress tracking
 - `transcribe_and_save()`: Full workflow with file management
+- `_get_audio_duration()`: Get audio length for progress estimation
 
-### 3. OllamaAnalyzer (`src/core/analyzer.py`)
+### 6. OllamaAnalyzer (`src/core/analyzer.py`)
 
 **Purpose**: AI-powered content analysis using local LLMs
 
@@ -158,28 +245,46 @@ result = await analyzer.full_analysis(transcript)
 **Purpose**: Video download and transcription interface
 
 **Key Features**:
-- URL input with universal support indication
-- Model selection (Whisper model sizes)
-- Download-only vs. full transcription modes
-- Smart checkbox logic (keep video becomes disabled in download-only)
-- Real-time progress bars for download and transcription
-- Process logging with timestamps
+- **Mixed Input Support**: URL input field + Browse button for local files
+- **File Browser**: Native file dialog with multiple file selection
+- **Input Validation**: Real-time validation showing URL/file counts
+- **Processing Queue**: Visual queue display showing all items being processed
+- **Model Selection**: Whisper model sizes (tiny.en to large-v3)
+- **Processing Options**: Download-only, keep video, copy files to assets/
+- **Progress Tracking**: Real-time progress bars for download and transcription
+- **Clickable Paths**: Click folder paths to open in file explorer
+- **Copy Buttons**: Quick copy of folder paths to clipboard
+- **Status Indicators**: Color-coded status messages (green=success, red=error, teal=processing)
+- **Process Logging**: Detailed log output with timestamps
 
 **Key Components**:
-- `DownloadWorker`: Background thread for heavy operations
+- `DownloadWorker`: Background thread using UnifiedProcessor
+- `UnifiedProcessor`: Handles mixed URL/file processing
 - Progress tracking via Qt signals
-- Folder path display for user awareness
+- Queue visualization for batch processing
+
+**New UI Elements**:
+- Browse button (📁 Browse) next to URL input
+- Validation feedback label below input
+- Copy files checkbox in settings
+- Processing queue display widget
+- Clickable folder path labels
+- Copy path buttons (📋)
 
 ### 3. AnalysisTab (`src/ui/analysis_tab.py`)
 
 **Purpose**: AI analysis interface and controls
 
 **Key Features**:
-- Transcript display and editing
+- Transcript display with copy button
 - AI model selection (Ollama models)
 - Tabbed results (Summary, Quotes, Topics, Sentiment, Custom)
 - Custom analysis prompt input
 - Real-time analysis progress
+- Copy transcript to clipboard functionality
+
+**New UI Elements**:
+- Copy Transcript button (📋 Copy Transcript) above transcript display
 
 ### 4. ResultsTab (`src/ui/results_tab.py`)
 
@@ -198,27 +303,35 @@ result = await analyzer.full_analysis(transcript)
 
 ### Complete Workflow
 ```
-1. User Input (URL) 
+1. User Input (URLs and/or Local Files)
    ↓
-2. DownloadWorker Thread
+2. InputProcessor.parse_mixed_input() - Detect and validate inputs
    ↓
-3. UniversalDownloader.download()
+3. DownloadWorker Thread
    ↓
-4. Video File (downloads/videos/)
+4. UnifiedProcessor.process_mixed_input()
+   ↓
+   For URLs:
+   ├─→ UniversalDownloader.download()
+   └─→ Video File (assets/videos/)
+   ↓
+   For Local Files:
+   ├─→ Copy to assets/videos/ (if copy_files=True)
+   └─→ Or use in-place (if copy_files=False)
    ↓
 5. WhisperTranscriber.transcribe_and_save() [if not download-only]
+   ├─→ Real-time progress tracking (time-based estimation)
+   └─→ Transcript File (assets/transcripts/)
    ↓
-6. Transcript File (downloads/transcripts/)
+6. Auto-navigation to Analysis Tab [if transcribed]
    ↓
-7. Auto-navigation to Analysis Tab [if transcribed]
+7. OllamaAnalyzer.full_analysis()
    ↓
-8. OllamaAnalyzer.full_analysis()
+8. AnalysisResult Object
    ↓
-9. AnalysisResult Object
+9. Auto-navigation to Results Tab
    ↓
-10. Auto-navigation to Results Tab
-    ↓
-11. Results Display + Export Options
+10. Results Display + Export Options
 ```
 
 ### Signal Flow
@@ -241,11 +354,16 @@ AnalysisTab.analysis_completed
 ```
 TranscriptAI/
 ├── src/                          # Source code
+│   ├── config/                   # Configuration
+│   │   ├── __init__.py
+│   │   └── paths.py              # Centralized path management
 │   ├── core/                     # Business logic
 │   │   ├── __init__.py
 │   │   ├── downloader.py         # Video download (yt-dlp wrapper)
 │   │   ├── transcriber.py        # Audio transcription (Whisper)
-│   │   └── analyzer.py           # AI analysis (Ollama)
+│   │   ├── analyzer.py           # AI analysis (Ollama)
+│   │   ├── processor.py          # Unified processing pipeline
+│   │   └── input_processor.py    # Mixed input detection/parsing
 │   ├── ui/                       # User interface
 │   │   ├── __init__.py
 │   │   ├── main_window.py        # Application shell
@@ -254,9 +372,10 @@ TranscriptAI/
 │   │   ├── results_tab.py        # Results display UI
 │   │   └── styles.py             # Dark theme CSS
 │   └── main.py                   # Application entry point
-├── downloads/                    # Generated content (gitignored)
+├── assets/                       # Generated content (gitignored)
 │   ├── videos/                   # Downloaded video files
-│   └── transcripts/              # Generated transcript files
+│   ├── transcripts/              # Generated transcript files
+│   └── analysis/                 # Future: AI analysis results
 ├── .venv/                        # Virtual environment (gitignored)
 ├── requirements.txt              # Python dependencies
 ├── run.py                        # Quick launcher script
@@ -322,6 +441,28 @@ def create_input_section(self) -> QGroupBox:
     group = QGroupBox("Video Input")
     # Build and return configured group
     return group
+```
+
+### 6. Unified Processing Pattern
+Single processor handles both URLs and local files uniformly.
+
+```python
+processor = UnifiedProcessor(model="medium.en", copy_files=True)
+results = await processor.process_mixed_input(
+    input_text,
+    progress_callback=...,
+    download_progress_callback=...,
+    transcription_progress_callback=...
+)
+```
+
+### 7. Input Validation Pattern
+Real-time validation with visual feedback.
+
+```python
+items = InputProcessor.parse_mixed_input(input_text)
+# Returns categorized: {"urls": [...], "files": [...], "invalid": [...]}
+# UI updates validation label with counts and status
 ```
 
 ---
@@ -414,12 +555,15 @@ self.model_combo.addItems([
 ])
 ```
 
-### Customizing Download Directory
-`src/core/downloader.py`, line ~26:
+### Customizing Asset Directories
+`src/config/paths.py`:
 ```python
-def __init__(self, output_dir: Optional[Path] = None):
-    if output_dir is None:
-        base_dir = Path("C:/YourCustomPath")  # Change default location
+class ProjectPaths:
+    BASE_DIR = Path.cwd()
+    ASSETS_DIR = BASE_DIR / "assets"  # Change this to customize base folder
+    VIDEOS_DIR = ASSETS_DIR / "videos"
+    TRANSCRIPTS_DIR = ASSETS_DIR / "transcripts"
+    # Modify paths as needed
 ```
 
 ### Adding Custom Themes
@@ -474,6 +618,14 @@ def setup_ui(self):
 1. Check variable ordering in start_process method
 2. Ensure worker cleanup in stop_process method
 3. Add null checks before calling worker methods
+
+### Progress Bar Not Updating
+**Problem**: Transcription progress bar stuck at 0%
+**Solution**:
+1. Ensure ffprobe is installed for audio duration detection: `ffmpeg` package includes ffprobe
+2. Progress uses time-based estimation (2.5x audio duration)
+3. If ffprobe unavailable, progress shows elapsed time instead
+4. Check terminal output - Whisper verbose mode shows actual progress
 
 ### Ollama Connection Issues
 **Problem**: "Model not available" or connection errors

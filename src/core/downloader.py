@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Callable, Optional
 import yt_dlp
 
+from src.config.paths import ProjectPaths
+
 
 class DownloadProgress:
     def __init__(self):
@@ -24,19 +26,17 @@ class DownloadProgress:
 class UniversalDownloader:
     def __init__(self, output_dir: Optional[Path] = None):
         if output_dir is None:
-            # Create organized folder structure
-            base_dir = Path.cwd()
-            self.downloads_dir = base_dir / "downloads" / "videos"
-            self.transcripts_dir = base_dir / "downloads" / "transcripts"
+            # Use new assets structure
+            self.downloads_dir = ProjectPaths.VIDEOS_DIR
+            self.transcripts_dir = ProjectPaths.TRANSCRIPTS_DIR
         else:
             self.downloads_dir = output_dir / "videos"
             self.transcripts_dir = output_dir / "transcripts"
-            
-        # Create directories
-        self.downloads_dir.mkdir(parents=True, exist_ok=True)
-        self.transcripts_dir.mkdir(parents=True, exist_ok=True)
         
-        # Keep the old output_dir for backwards compatibility
+        # Ensure directories exist
+        ProjectPaths.ensure_directories()
+        
+        # Keep backwards compatibility
         self.output_dir = self.downloads_dir
         
     def _progress_hook(self, d, callback: Optional[Callable[[DownloadProgress], None]] = None):
