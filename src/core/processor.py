@@ -4,6 +4,7 @@ Unified processing pipeline for URLs and local files
 import asyncio
 import re
 import shutil
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
@@ -29,12 +30,28 @@ class ProcessingItem:
 class UnifiedProcessor:
     """Unified processor for URLs and local files"""
     
-    def __init__(self, model: str = "medium.en", download_only: bool = False, keep_video: bool = False, copy_files: bool = True):
+    def __init__(
+        self,
+        model: str = "medium.en",
+        download_only: bool = False,
+        keep_video: bool = False,
+        copy_files: bool = True,
+        youtube_captions_first: bool = True,
+        use_browser_cookies: bool = True,
+        caption_retry_count: int = 3,
+        caption_backoff_seconds: float = 8.0,
+        caption_batch_delay_seconds: float = 2.0,
+    ):
         self.downloader = UniversalDownloader()
         self.transcriber = WhisperTranscriber(model) if not download_only else None
         self.download_only = download_only
         self.keep_video = keep_video
         self.copy_files = copy_files  # Whether to copy local files to assets/
+        self.youtube_captions_first = youtube_captions_first
+        self.use_browser_cookies = use_browser_cookies
+        self.caption_retry_count = max(0, int(caption_retry_count))
+        self.caption_backoff_seconds = max(1.0, float(caption_backoff_seconds))
+        self.caption_batch_delay_seconds = max(0.0, float(caption_batch_delay_seconds))
     
     def generate_transcript_filename(self, video_path: Path, source: str) -> str:
         """Generate smart transcript filename"""
@@ -78,21 +95,48 @@ class UnifiedProcessor:
         
         # Process queue sequentially
         results = []
-        for item in queue:
-            try:
-                result = await self.process_single_item(
-                    item,
-                    progress_callback,
-                    download_progress_callback,
-                    transcription_progress_callback
-                )
-                results.append(result)
-            except Exception as e:
-                item.status = "error"
-                item.error_message = str(e)
-                results.append(item)
-        
-        return results
+        last_caption_attempt_at: Optional[float] = None
+        try:
+            for item in queue:
+                if (
+                    item.needs_download
+                    and self.youtube_captions_first
+                    and self.downloader.is_youtube_url(item.source)
+                    and last_caption_attempt_at is not None
+                ):
+                    elapsed = time.monotonic() - last_caption_attempt_at
+                    wait_seconds = self.caption_batch_delay_seconds - elapsed
+                    if wait_seconds > 0:
+                        if progress_callback:
+                            progress_callback(
+                                f"Throttling YouTube caption request for {wait_seconds:.1f}s to reduce rate limits..."
+                            )
+                        await asyncio.sleep(wait_seconds)
+
+                try:
+                    result = await self.process_single_item(
+                        item,
+                        progress_callback,
+                        download_progress_callback,
+                        transcription_progress_callback
+                    )
+                    results.append(result)
+                except Exception as e:
+                    item.status = "error"
+                    item.error_message = str(e)
+                    results.append(item)
+                finally:
+                    if (
+                        item.needs_download
+                        and self.youtube_captions_first
+                        and self.downloader.is_youtube_url(item.source)
+                    ):
+                        last_caption_attempt_at = time.monotonic()
+            return results
+        finally:
+            # Release Whisper resources after each processing run.
+            if self.transcriber:
+                self.transcriber.unload_model()
     
     async def process_single_item(self, item: ProcessingItem,
                                   progress_callback: Optional[Callable[[str], None]] = None,
@@ -105,6 +149,30 @@ class UnifiedProcessor:
         
         # Step 1: Get video file
         if item.needs_download:
+            if (
+                not self.download_only
+                and self.youtube_captions_first
+                and self.downloader.is_youtube_url(item.source)
+            ):
+                if progress_callback:
+                    progress_callback("Trying YouTube captions first (fast path)...")
+                try:
+                    transcript_text, transcript_path = await self.downloader.download_youtube_captions(
+                        item.source,
+                        use_browser_cookies=self.use_browser_cookies,
+                        max_retries=self.caption_retry_count,
+                        backoff_base_seconds=self.caption_backoff_seconds,
+                    )
+                    item.transcript_path = transcript_path
+                    item.status = "completed"
+                    item.progress = 100.0
+                    if progress_callback:
+                        progress_callback(f"Using YouTube captions: {transcript_path.name}")
+                    return item
+                except Exception as e:
+                    if progress_callback:
+                        progress_callback(f"YouTube captions unavailable, falling back to Whisper: {e}")
+
             # Download URL
             item.status = "downloading"
             video_path = await self.downloader.download(item.source, download_progress_callback)

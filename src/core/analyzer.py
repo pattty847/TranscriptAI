@@ -5,7 +5,6 @@ import asyncio
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import ollama
@@ -25,25 +24,94 @@ class OllamaAnalyzer:
     def __init__(self, model: str = "llama3.2"):
         self.model = model
         self.client = ollama.Client()
-        
+        # On lower-memory systems, unload model after each call.
+        self.keep_alive = "0s"
+
+    @staticmethod
+    def _normalize_model_name(name: str) -> str:
+        """Normalize model aliases such as `llama3.2` and `llama3.2:latest`."""
+        return name.strip().lower().split(":")[0]
+
+    @staticmethod
+    def _extract_model_names(response: Any) -> List[str]:
+        """Support both dict responses and typed Ollama ListResponse objects."""
+        names: List[str] = []
+
+        if isinstance(response, dict):
+            for model in response.get("models", []):
+                name = model.get("name") or model.get("model")
+                if name:
+                    names.append(str(name))
+            return names
+
+        model_list = getattr(response, "models", None)
+        if model_list:
+            for model in model_list:
+                name = getattr(model, "model", None) or getattr(model, "name", None)
+                if name:
+                    names.append(str(name))
+        return names
+
+    @staticmethod
+    def _extract_chat_content(response: Any) -> str:
+        """Support both dict responses and typed Ollama ChatResponse objects."""
+        if isinstance(response, dict):
+            return response.get("message", {}).get("content", "")
+
+        message = getattr(response, "message", None)
+        if message is not None:
+            content = getattr(message, "content", "")
+            if content:
+                return str(content)
+        return ""
+
+    async def list_available_models(self) -> List[str]:
+        """Return available local Ollama model names."""
+        try:
+            models = await asyncio.to_thread(self.client.list)
+            return self._extract_model_names(models)
+        except Exception:
+            return []
+
     async def check_model_availability(self) -> bool:
         """Check if the specified model is available"""
         try:
-            models = await asyncio.to_thread(self.client.list)
-            available_models = [model['name'] for model in models.get('models', [])]
-            return any(self.model in name for name in available_models)
+            requested = self._normalize_model_name(self.model)
+            available_models = await self.list_available_models()
+            if not available_models:
+                return False
+
+            for name in available_models:
+                normalized = self._normalize_model_name(name)
+                if normalized == requested or name.lower() == self.model.lower():
+                    return True
+            return False
         except Exception:
             return False
+
+    async def resolve_model_name(self) -> Optional[str]:
+        """Return the local model name that should be used for calls."""
+        requested = self._normalize_model_name(self.model)
+        for name in await self.list_available_models():
+            if self._normalize_model_name(name) == requested or name.lower() == self.model.lower():
+                return name
+        return None
             
     async def ensure_model(self) -> bool:
         """Ensure model is available, pull if necessary"""
-        if await self.check_model_availability():
+        resolved = await self.resolve_model_name()
+        if resolved:
+            self.model = resolved
             return True
             
         try:
             # Pull the model
             await asyncio.to_thread(self.client.pull, self.model)
-            return True
+            resolved = await self.resolve_model_name()
+            if resolved:
+                self.model = resolved
+                return True
+            return False
         except Exception as e:
             print(f"Failed to pull model {self.model}: {e}")
             return False
@@ -57,9 +125,11 @@ class OllamaAnalyzer:
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
-                ]
+                ],
+                keep_alive=self.keep_alive,
             )
-            return response['message']['content']
+            content = self._extract_chat_content(response)
+            return content or "Error: Empty model response"
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -159,7 +229,18 @@ class OllamaAnalyzer:
 
     async def custom_analysis(self, transcript: str, custom_prompt: str) -> str:
         """Run custom analysis with user-provided prompt"""
-        return await self._generate_response(f"{custom_prompt}\n\nTranscript:\n{transcript[:4000]}...")
+        prompt = (
+            f"{custom_prompt}\n\n"
+            "Use the following transcript as source material. "
+            "If evidence is not present, say so explicitly.\n\n"
+            f"Transcript:\n{transcript[:6000]}..."
+        )
+        return await self._generate_response(prompt)
+
+    async def test_model_response(self) -> str:
+        """Run a lightweight model test request."""
+        prompt = "Reply with exactly: MODEL_OK"
+        return await self._generate_response(prompt, "You are a concise assistant.")
 
     async def full_analysis(self, transcript: str) -> AnalysisResult:
         """Run comprehensive analysis on transcript"""
@@ -168,16 +249,11 @@ class OllamaAnalyzer:
         if not await self.ensure_model():
             raise Exception(f"Model {self.model} is not available and could not be downloaded")
         
-        # Run all analyses concurrently
-        summary_task = self.summarize(transcript)
-        quotes_task = self.extract_quotes(transcript)
-        topics_task = self.extract_topics(transcript)
-        sentiment_task = self.analyze_sentiment(transcript)
-        
-        # Wait for all to complete
-        summary, quotes, topics, sentiment = await asyncio.gather(
-            summary_task, quotes_task, topics_task, sentiment_task
-        )
+        # Run analyses sequentially to avoid large RAM spikes.
+        summary = await self.summarize(transcript)
+        quotes = await self.extract_quotes(transcript)
+        topics = await self.extract_topics(transcript)
+        sentiment = await self.analyze_sentiment(transcript)
         
         return AnalysisResult(
             summary=summary,

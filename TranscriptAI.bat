@@ -1,11 +1,29 @@
 @echo off
 cd /d "%~dp0"
-title TranscriptAI - Modern Video Analysis
-echo 🚀 Launching TranscriptAI...
-call .venv\Scripts\activate.bat
-python run.py
+title TranscriptAI
+
+where uv >nul 2>nul
+if errorlevel 1 (
+    echo uv is not installed.
+    echo Install it from: https://docs.astral.sh/uv/getting-started/installation/
+    pause
+    exit /b 1
+)
+
+if not exist ".venv" (
+    echo Setting up environment with uv sync...
+    uv sync
+    if errorlevel 1 (
+        echo Setup failed.
+        pause
+        exit /b 1
+    )
+)
+
+echo Launching TranscriptAI...
+uv run python run.py
 if errorlevel 1 (
     echo.
-    echo ❌ Error occurred. Press any key to exit...
-    pause >nul
+    echo Application exited with an error.
+    pause
 )

@@ -2,6 +2,7 @@
 Modern audio transcription with Whisper AI
 """
 import asyncio
+import gc
 import subprocess
 import tempfile
 import threading
@@ -9,6 +10,10 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 import whisper
+try:
+    import torch
+except Exception:  # pragma: no cover
+    torch = None
 
 from src.config.paths import ProjectPaths
 
@@ -39,18 +44,36 @@ class WhisperTranscriber:
         progress.message = f"Loading {self.model_name} model..."
         if progress_callback:
             progress_callback(progress)
-            
+
         loop = asyncio.get_event_loop()
-        
+
         def _load_model():
             return whisper.load_model(self.model_name, device=self.device)
-            
+
         self.model = await loop.run_in_executor(None, _load_model)
-        
+
         progress.percent = 100.0
         progress.message = "Model loaded successfully"
         if progress_callback:
             progress_callback(progress)
+
+    def unload_model(self):
+        """Release loaded Whisper model and clear memory caches."""
+        if self.model is not None:
+            try:
+                del self.model
+            except Exception:
+                pass
+            self.model = None
+
+        gc.collect()
+        if torch is not None and torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+                if hasattr(torch.cuda, "ipc_collect"):
+                    torch.cuda.ipc_collect()
+            except Exception:
+                pass
 
     def _get_audio_duration(self, audio_path: Path) -> float:
         """Get audio duration in seconds using ffprobe"""

@@ -1,0 +1,23 @@
+[project]
+name = "transcriptai"
+version = "1.0.0"
+description = "Desktop app for download, transcription, and local AI analysis."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6",
+    "yt-dlp",
+    "openai-whisper",
+    "ollama",
+    "requests",
+    "aiofiles",
+    "rich",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "torch",
+]
+
+[tool.uv]
+package = false

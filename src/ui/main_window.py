@@ -1,189 +1,161 @@
 """
-Main application window with modern tabbed interface
+Main application window and tab coordination.
 """
-import asyncio
+from __future__ import annotations
+
 import sys
 from pathlib import Path
-from typing import Optional
 
-from PySide6.QtCore import QThread, QTimer, Signal, QUrl
-from PySide6.QtGui import QDesktopServices, QFont, QIcon
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QVBoxLayout, 
-    QHBoxLayout, QWidget, QLabel, QFrame, QSplitter
+    QApplication, QMainWindow, QTabWidget, QVBoxLayout,
+    QHBoxLayout, QWidget, QLabel, QFrame, QToolBar
 )
 
-from src.ui.styles import DARK_THEME
-from src.ui.download_tab import DownloadTab
-from src.ui.analysis_tab import AnalysisTab
-from src.ui.results_tab import ResultsTab
 from src.config.paths import ProjectPaths
+from src.ui.analysis_tab import AnalysisTab
+from src.ui.download_tab import DownloadTab
+from src.ui.results_tab import ResultsTab
+from src.ui.styles import DARK_THEME
 
 
 class MainWindow(QMainWindow):
+    """Main app shell."""
+
     def __init__(self):
         super().__init__()
-        # Initialize folder structure
         ProjectPaths.initialize()
         self.setup_ui()
         self.setup_theme()
-        
+
     def setup_ui(self):
-        """Initialize the main UI"""
+        """Initialize the main UI."""
         self.setWindowTitle("TranscriptAI - Modern Video Analysis")
-        self.setMinimumSize(1200, 800)
-        self.resize(1400, 900)
-        
-        # Create central widget
+        self.setMinimumSize(980, 680)
+        self.resize(1120, 760)
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
-        # Main layout
+
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(16)
-        
-        # Header
-        header = self.create_header()
-        main_layout.addWidget(header)
-        
-        # Tab widget
+        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setSpacing(10)
+
+        main_layout.addWidget(self.create_header())
+
         self.tab_widget = QTabWidget()
         self.tab_widget.setMovable(False)
-        
-        # Create tabs
+
         self.download_tab = DownloadTab()
         self.analysis_tab = AnalysisTab()
         self.results_tab = ResultsTab()
-        
-        # Add tabs
-        self.tab_widget.addTab(self.download_tab, "📥 Download & Transcribe")
-        self.tab_widget.addTab(self.analysis_tab, "🤖 AI Analysis")
-        self.tab_widget.addTab(self.results_tab, "📊 Results & Export")
-        
+
+        self.tab_widget.addTab(self.download_tab, "Download & Transcribe")
+        self.tab_widget.addTab(self.analysis_tab, "AI Analysis")
+        self.tab_widget.addTab(self.results_tab, "Results & Export")
         main_layout.addWidget(self.tab_widget)
-        
-        # Connect signals
+
+        self.create_toolbar()
         self.setup_connections()
-        
+
+    def create_toolbar(self):
+        """Create quick-action toolbar."""
+        toolbar = QToolBar("Quick Actions", self)
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setObjectName("mainToolbar")
+        self.addToolBar(toolbar)
+
+        new_session = toolbar.addAction("New Session")
+        new_session.triggered.connect(self.reset_session)
+
+        open_videos = toolbar.addAction("Open Videos")
+        open_videos.triggered.connect(lambda: self.download_tab.open_folder(ProjectPaths.VIDEOS_DIR))
+
+        open_transcripts = toolbar.addAction("Open Transcripts")
+        open_transcripts.triggered.connect(lambda: self.download_tab.open_folder(ProjectPaths.TRANSCRIPTS_DIR))
+
+        clear_results = toolbar.addAction("Clear Results")
+        clear_results.triggered.connect(self.results_tab.clear_results)
+
     def create_header(self) -> QFrame:
-        """Create the application header"""
+        """Create a compact app header."""
         header = QFrame()
         header.setObjectName("header")
-        header.setMaximumHeight(80)
-        
+        header.setMaximumHeight(62)
+
         layout = QHBoxLayout(header)
         layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Title section
+
         title_widget = QWidget()
         title_layout = QVBoxLayout(title_widget)
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(0)
-        
+
         title = QLabel("TranscriptAI")
         title.setObjectName("title")
-        title.setStyleSheet("""
-            QLabel#title {
-                font-size: 28px;
-                font-weight: 700;
-                color: #0d7377;
-                margin: 0px;
-            }
-        """)
-        
-        subtitle = QLabel("Download • Transcribe • Analyze with AI")
+        subtitle = QLabel("Download, transcribe, and analyze locally")
         subtitle.setObjectName("subtitle")
-        subtitle.setStyleSheet("""
-            QLabel#subtitle {
-                font-size: 14px;
-                color: #9c9c9c;
-                margin: 0px;
-            }
-        """)
-        
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
-        
+
         layout.addWidget(title_widget)
         layout.addStretch()
-        
-        # Version info
+
         version_label = QLabel("v1.0.0")
-        version_label.setStyleSheet("""
-            QLabel {
-                font-size: 12px;
-                color: #6c6c6c;
-                padding: 4px 8px;
-                background-color: #3c3c3c;
-                border-radius: 4px;
-            }
-        """)
+        version_label.setObjectName("version")
         layout.addWidget(version_label)
-        
         return header
-        
+
     def setup_theme(self):
-        """Apply the dark theme"""
+        """Apply global theme and fonts."""
         self.setStyleSheet(DARK_THEME)
-        
-        # Set font
         font = QFont("Segoe UI", 10)
         self.setFont(font)
         QApplication.instance().setFont(font)
-        
+
     def setup_connections(self):
-        """Connect signals between tabs"""
-        # When download completes, switch to analysis tab
+        """Connect cross-tab signals."""
         self.download_tab.transcription_completed.connect(self.on_transcription_completed)
-        
-        # When analysis completes, switch to results tab
         self.analysis_tab.analysis_completed.connect(self.on_analysis_completed)
-        
+
     def on_transcription_completed(self, transcript_path: Path, transcript_text: str):
-        """Handle transcription completion"""
-        # Pass data to analysis tab
+        """Load transcript into analysis tab and move user there."""
         self.analysis_tab.load_transcript(transcript_text)
-        
-        # Switch to analysis tab
         self.tab_widget.setCurrentIndex(1)
-        
+
     def on_analysis_completed(self, analysis_result):
-        """Handle analysis completion"""
-        # Pass data to results tab
+        """Load analysis result into results tab and move user there."""
         self.results_tab.load_results(analysis_result)
-        
-        # Switch to results tab
         self.tab_widget.setCurrentIndex(2)
+
+    def reset_session(self):
+        """Reset analysis and results for a fresh workflow."""
+        self.analysis_tab.clear_transcript_session(confirm=False)
+        self.results_tab.clear_results()
+        self.tab_widget.setCurrentIndex(0)
 
 
 def create_app() -> QApplication:
-    """Create and configure the QApplication"""
+    """Create and configure QApplication."""
     app = QApplication(sys.argv)
     app.setApplicationName("TranscriptAI")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("TranscriptAI")
-    
-    # Set application icon (if available)
-    # app.setWindowIcon(QIcon("icon.png"))
-    
     return app
 
 
 def main():
-    """Main application entry point"""
+    """Main application entry point."""
     app = create_app()
-    
     window = MainWindow()
     window.show()
-    
-    # Center the window
+
     screen = app.primaryScreen().geometry()
     window_size = window.geometry()
     x = (screen.width() - window_size.width()) // 2
     y = (screen.height() - window_size.height()) // 2
     window.move(x, y)
-    
     sys.exit(app.exec())
 
 

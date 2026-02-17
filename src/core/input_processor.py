@@ -23,8 +23,11 @@ class InputProcessor:
         r'^[a-zA-Z0-9-]+\.(com|org|net|io|co|tv|be|de|fr|uk)',  # domain.com
     ]
     
-    # Supported video extensions
-    VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp'}
+    # Supported media extensions (video + audio)
+    MEDIA_EXTENSIONS = {
+        '.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp',
+        '.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg', '.opus', '.wma', '.aiff', '.aif'
+    }
     
     @staticmethod
     def detect_input_type(input_text: str) -> InputType:
@@ -42,13 +45,13 @@ class InputProcessor:
         # Check if it's a file path
         path = Path(input_text)
         if path.exists() and path.is_file():
-            # Check if it's a video file
-            if path.suffix.lower() in InputProcessor.VIDEO_EXTENSIONS:
+            # Check if it's a supported media file
+            if path.suffix.lower() in InputProcessor.MEDIA_EXTENSIONS:
                 return InputType.FILE
             return InputType.INVALID
         
         # Check if it looks like a file path (absolute or relative)
-        if path.suffix.lower() in InputProcessor.VIDEO_EXTENSIONS:
+        if path.suffix.lower() in InputProcessor.MEDIA_EXTENSIONS:
             # Might be a file that doesn't exist yet, but has valid extension
             return InputType.FILE
         
@@ -97,10 +100,10 @@ class InputProcessor:
         for file_path in file_paths:
             path = Path(file_path)
             if path.exists() and path.is_file():
-                if path.suffix.lower() in InputProcessor.VIDEO_EXTENSIONS:
+                if path.suffix.lower() in InputProcessor.MEDIA_EXTENSIONS:
                     valid.append(path)
                 else:
-                    invalid.append(f"{file_path} (not a video file)")
+                    invalid.append(f"{file_path} (not a supported media file)")
             else:
                 invalid.append(f"{file_path} (file not found)")
         
