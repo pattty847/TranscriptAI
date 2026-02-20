@@ -1,4 +1,4 @@
 """
-Configuration module for TranscriptAI
+Configuration module for Subtext
 """
 

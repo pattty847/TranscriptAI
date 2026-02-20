@@ -1,4 +1,4 @@
-# TranscriptAI - Lightweight Spec
+# Subtext - Lightweight Spec
 
 ## Core Vision
 A beautiful, modern desktop app that transforms video content into actionable insights through transcription and AI analysis.

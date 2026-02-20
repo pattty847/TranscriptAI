@@ -20,5 +20,5 @@ if errorlevel 1 (
 
 echo.
 echo Setup complete.
-echo Launch with: TranscriptAI.bat
+echo Launch with: win-launch.bat
 pause

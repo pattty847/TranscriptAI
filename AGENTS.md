@@ -1,4 +1,4 @@
-# AGENTS.md - TranscriptAI Contributor Guide
+# AGENTS.md - Subtext Contributor Guide
 
 This file is the fast context guide for coding agents and contributors.
 

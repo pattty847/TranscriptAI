@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title TranscriptAI
+title Subtext
 
 where uv >nul 2>nul
 if errorlevel 1 (
@@ -20,7 +20,7 @@ if not exist ".venv" (
     )
 )
 
-echo Launching TranscriptAI...
+echo Launching Subtext...
 uv run python run.py
 if errorlevel 1 (
     echo.

@@ -3,6 +3,7 @@ Modern audio transcription with Whisper AI
 """
 import asyncio
 import gc
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -17,6 +18,8 @@ except Exception:  # pragma: no cover
 
 from src.config.paths import ProjectPaths
 
+FFMPEG_DOWNLOAD_URL = "https://www.ffmpeg.org/download.html"
+
 
 class TranscriptionProgress:
     def __init__(self):
@@ -29,10 +32,37 @@ class TranscriptionProgress:
 
 
 class WhisperTranscriber:
-    def __init__(self, model_name: str = "medium.en", device: str = "cuda"):
+    def __init__(self, model_name: str = "medium.en", device: Optional[str] = None):
         self.model_name = model_name
-        self.device = device
+        self.device = self._resolve_device(device)
+        self.use_fp16 = self.device == "cuda"
         self.model = None
+
+    @staticmethod
+    def _resolve_device(device: Optional[str]) -> str:
+        """Resolve Whisper runtime device with safe fallbacks."""
+        if device and device.strip() and device.lower() != "auto":
+            return device.lower()
+
+        if torch is not None:
+            try:
+                if torch.cuda.is_available():
+                    return "cuda"
+            except Exception:
+                pass
+
+            try:
+                mps_backend = getattr(torch.backends, "mps", None)
+                if (
+                    mps_backend is not None
+                    and mps_backend.is_built()
+                    and mps_backend.is_available()
+                ):
+                    return "mps"
+            except Exception:
+                pass
+
+        return "cpu"
         
     async def load_model(self, progress_callback: Optional[Callable[[TranscriptionProgress], None]] = None):
         """Load Whisper model asynchronously"""
@@ -41,7 +71,7 @@ class WhisperTranscriber:
             
         progress = TranscriptionProgress()
         progress.stage = "loading"
-        progress.message = f"Loading {self.model_name} model..."
+        progress.message = f"Loading {self.model_name} model on {self.device}..."
         if progress_callback:
             progress_callback(progress)
 
@@ -93,10 +123,24 @@ class WhisperTranscriber:
         except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
             pass
         return 0.0
+
+    @staticmethod
+    def _ensure_ffmpeg_available() -> None:
+        """Validate ffmpeg/ffprobe binaries are available in PATH."""
+        missing_tools = [
+            tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None
+        ]
+        if missing_tools:
+            missing = ", ".join(missing_tools)
+            raise Exception(
+                f"Missing required media tools: {missing}. "
+                f"Install FFmpeg: {FFMPEG_DOWNLOAD_URL}"
+            )
     
     async def transcribe(self, audio_path: Path, progress_callback: Optional[Callable[[TranscriptionProgress], None]] = None) -> str:
         """Transcribe audio file to text"""
-        
+        self._ensure_ffmpeg_available()
+
         if self.model is None:
             await self.load_model(progress_callback)
         
@@ -154,7 +198,11 @@ class WhisperTranscriber:
         
         def _transcribe():
             # Use verbose mode to see progress in terminal, but we estimate progress via time
-            result = self.model.transcribe(str(audio_path), fp16=True, verbose=True)
+            result = self.model.transcribe(
+                str(audio_path),
+                fp16=self.use_fp16,
+                verbose=True,
+            )
             transcription_complete.set()  # Signal that transcription is done
             return result["text"].strip()
             

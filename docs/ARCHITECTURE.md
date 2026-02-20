@@ -1,10 +1,10 @@
-# TranscriptAI Architecture
+# Subtext Architecture
 
-This document describes the current structure and data flow of TranscriptAI.
+This document describes the current structure and data flow of Subtext.
 
 ## Overview
 
-TranscriptAI is a PySide6 desktop app with asynchronous core services and QThread workers.
+Subtext is a PySide6 desktop app with asynchronous core services and QThread workers.
 
 High-level flow:
 
@@ -58,6 +58,8 @@ For each queue item:
 Notes:
 - Caption requests use retry/backoff + optional browser cookies.
 - Batch processing is sequential (intentional for memory stability).
+- Whisper device is auto-selected (`cuda` -> `mps` -> `cpu` fallback).
+- Whisper transcription requires FFmpeg binaries (`ffmpeg`/`ffprobe`) on PATH.
 - Whisper resources are explicitly unloaded after processing.
 
 ## Analysis Pipeline

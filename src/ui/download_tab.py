@@ -3,13 +3,14 @@ Download and transcription tab with batch-aware workflows.
 """
 from __future__ import annotations
 
+import html
 import os
 import platform
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -25,6 +26,7 @@ from src.ui.workers import DownloadWorker
 class DownloadTab(QWidget):
     """Download and transcription tab."""
     transcription_completed = Signal(Path, str)  # (file_path, transcript_text)
+    FFMPEG_DOWNLOAD_URL = "https://www.ffmpeg.org/download.html"
 
     def __init__(self):
         super().__init__()
@@ -180,6 +182,13 @@ class DownloadTab(QWidget):
         self.status_label.setWordWrap(True)
         self.status_label.setProperty("class", "status")
         layout.addWidget(self.status_label)
+
+        self.install_help_label = QLabel("")
+        self.install_help_label.setWordWrap(True)
+        self.install_help_label.setOpenExternalLinks(True)
+        self.install_help_label.setTextFormat(Qt.TextFormat.RichText)
+        self.install_help_label.setVisible(False)
+        layout.addWidget(self.install_help_label)
         return widget
 
     def create_log_section(self) -> QWidget:
@@ -308,6 +317,8 @@ class DownloadTab(QWidget):
     def update_status(self, message: str):
         """Update status text and log."""
         self.status_label.setText(message)
+        self.install_help_label.setVisible(False)
+        self.install_help_label.clear()
         lowered = message.lower()
         if "error" in lowered:
             self.status_label.setProperty("class", "status-error")
@@ -405,6 +416,15 @@ class DownloadTab(QWidget):
         self.status_label.setText(f"Error: {error_message}")
         self.status_label.setProperty("class", "status-error")
 
+        if self._is_ffmpeg_error(error_message):
+            escaped_url = html.escape(self.FFMPEG_DOWNLOAD_URL, quote=True)
+            self.install_help_label.setText(
+                f"FFmpeg is required for transcription. "
+                f"<a href=\"{escaped_url}\">Click here to download/install FFmpeg.</a>"
+            )
+            self.install_help_label.setVisible(True)
+            self.add_log(f"Install FFmpeg: {self.FFMPEG_DOWNLOAD_URL}")
+
         current_text = self.queue_list.toPlainText()
         if current_text:
             lines = current_text.split("\n")
@@ -415,6 +435,11 @@ class DownloadTab(QWidget):
                 else:
                     updated.append(line)
             self.queue_list.setPlainText("\n".join(updated))
+
+    @staticmethod
+    def _is_ffmpeg_error(error_message: str) -> bool:
+        lowered = error_message.lower()
+        return "ffmpeg" in lowered or "ffprobe" in lowered
 
     def on_worker_finished(self):
         """Cleanup worker state after process finishes."""

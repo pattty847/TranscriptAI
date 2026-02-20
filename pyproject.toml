@@ -1,5 +1,5 @@
 [project]
-name = "transcriptai"
+name = "subtext"
 version = "1.0.0"
 description = "Desktop app for download, transcription, and local AI analysis."
 readme = "README.md"

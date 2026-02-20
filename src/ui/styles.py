@@ -1,5 +1,5 @@
 """
-Modern dark theme styling for TranscriptAI
+Modern dark theme styling for Subtext
 """
 
 DARK_THEME = """

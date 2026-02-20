@@ -1106,7 +1106,7 @@ wheels = [
 ]
 
 [[package]]
-name = "transcriptai"
+name = "subtext"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

@@ -1,1 +1,1 @@
-# TranscriptAI Modern UI
+# Subtext Modern UI

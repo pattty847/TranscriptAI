@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Lightweight launcher for TranscriptAI.
+Lightweight launcher for Subtext.
 
 Recommended usage:
     uv run python run.py
@@ -18,7 +18,7 @@ def main() -> int:
         print("Main script not found: src/main.py")
         return 1
 
-    print("Launching TranscriptAI...")
+    print("Launching Subtext...")
     try:
         subprocess.run([sys.executable, str(main_script)], check=True)
         return 0
@@ -26,7 +26,7 @@ def main() -> int:
         print(f"Application failed to start: {e}")
         return 1
     except KeyboardInterrupt:
-        print("\nTranscriptAI closed by user")
+        print("\nSubtext closed by user")
         return 0
 
 

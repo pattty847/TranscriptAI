@@ -1,4 +1,4 @@
-# TranscriptAI
+# Subtext
 
 Desktop app for downloading media, generating transcripts, and running local AI analysis.
 
@@ -14,12 +14,13 @@ Desktop app for downloading media, generating transcripts, and running local AI 
 
 ## Requirements
 
-- Windows 10/11
+- Windows 10/11 or macOS
 - Python 3.11+
 - `uv` installed: https://docs.astral.sh/uv/getting-started/installation/
+- FFmpeg (`ffmpeg` and `ffprobe` on PATH): https://www.ffmpeg.org/download.html
 - Optional but recommended:
   - Ollama for analysis
-  - NVIDIA CUDA for faster Whisper
+  - NVIDIA CUDA for faster Whisper on supported Windows/Linux systems
 
 ## Quick Start
 
@@ -28,7 +29,17 @@ uv sync
 uv run python run.py
 ```
 
-Or double-click `TranscriptAI.bat` on Windows.
+Launch helpers:
+- Windows: double-click `win-launch.bat`
+- macOS/Linux: run `./mac-launch`
+
+## FFmpeg Setup
+
+Whisper transcription requires FFmpeg.
+
+1. Install from: https://www.ffmpeg.org/download.html
+2. Make sure both `ffmpeg` and `ffprobe` are available in your terminal `PATH`.
+3. Restart Subtext after installation.
 
 ## First-Time Setup (AI Analysis)
 
@@ -37,7 +48,7 @@ Or double-click `TranscriptAI.bat` on Windows.
    ```bash
    ollama pull llama3.2
    ```
-3. In TranscriptAI:
+3. In Subtext:
    - Analysis tab -> `Refresh Models`
    - Select model
    - Click `Test Model`
@@ -58,10 +69,15 @@ If you want GPU acceleration for Whisper:
 scripts\install_cuda.bat
 ```
 
+Whisper device selection is automatic:
+- `cuda` when available
+- `mps` on supported Apple Silicon setups
+- `cpu` fallback otherwise
+
 ## Project Structure
 
 ```text
-TranscriptAI/
+Subtext/
   src/
     config/        # paths and app configuration
     core/          # downloader, transcriber, analyzer, processor

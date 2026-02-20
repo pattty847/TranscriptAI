@@ -1,5 +1,5 @@
 """
-Build a Windows executable for TranscriptAI using PyInstaller.
+Build a Windows executable for Subtext using PyInstaller.
 
 Run from project root:
     uv run python scripts/build_exe.py
@@ -20,7 +20,7 @@ def build_executable() -> None:
         "pyinstaller",
         "--onefile",
         "--windowed",
-        "--name", "TranscriptAI",
+        "--name", "Subtext",
         "--add-data", f"{project_root / 'src'};src",
         "--hidden-import", "PySide6",
         "--hidden-import", "torch",
@@ -36,7 +36,7 @@ def build_executable() -> None:
     print("Building executable...")
     print(" ".join(cmd))
     subprocess.run(cmd, check=True, cwd=project_root)
-    print("Build complete: dist/TranscriptAI.exe")
+    print("Build complete: dist/Subtext.exe")
 
 
 if __name__ == "__main__":

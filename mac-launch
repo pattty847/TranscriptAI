@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "Subtext"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is not installed."
+  echo "Install it from: https://docs.astral.sh/uv/getting-started/installation/"
+  exit 1
+fi
+
+if [ ! -d ".venv" ]; then
+  echo "Setting up environment with uv sync..."
+  if ! uv sync; then
+    echo "Setup failed."
+    exit 1
+  fi
+fi
+
+echo "Launching Subtext..."
+if ! uv run python run.py; then
+  echo
+  echo "Application exited with an error."
+  exit 1
+fi

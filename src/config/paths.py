@@ -1,5 +1,5 @@
 """
-Centralized path management for TranscriptAI
+Centralized path management for Subtext
 """
 from pathlib import Path
 import shutil

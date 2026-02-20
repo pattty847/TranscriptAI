@@ -1,5 +1,5 @@
 """
-TranscriptAI - Modern Video Analysis Application
+Subtext - Modern Video Analysis Application
 Entry point for the application
 """
 import sys

@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
 
     def setup_ui(self):
         """Initialize the main UI."""
-        self.setWindowTitle("TranscriptAI - Modern Video Analysis")
+        self.setWindowTitle("Subtext - Modern Video Analysis")
         self.setMinimumSize(980, 680)
         self.resize(1120, 760)
 
@@ -92,7 +92,7 @@ class MainWindow(QMainWindow):
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setSpacing(0)
 
-        title = QLabel("TranscriptAI")
+        title = QLabel("Subtext")
         title.setObjectName("title")
         subtitle = QLabel("Download, transcribe, and analyze locally")
         subtitle.setObjectName("subtitle")
@@ -139,9 +139,9 @@ class MainWindow(QMainWindow):
 def create_app() -> QApplication:
     """Create and configure QApplication."""
     app = QApplication(sys.argv)
-    app.setApplicationName("TranscriptAI")
+    app.setApplicationName("Subtext")
     app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("TranscriptAI")
+    app.setOrganizationName("Subtext")
     return app
 
 
