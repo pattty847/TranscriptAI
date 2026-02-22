@@ -93,6 +93,12 @@ DownloadTab.transcription_completed -> MainWindow -> AnalysisTab.load_transcript
 AnalysisTab.analysis_completed -> MainWindow -> ResultsTab.load_results
 ```
 
+## Web Layer (`src/web`)
+
+- `server.py`: FastAPI app; POST `/api/transcribe` (URL or file + model), GET `/api/jobs/{id}` for status/result. Serves static HTML/CSS/JS.
+- `static/`: Single-page UI — URL input, file upload, Whisper model select, progress, transcript with copy/download. Designed for use from phone or desktop on the same network.
+- Launched with `run_web.py` (uvicorn on `0.0.0.0:8765`). Reuses `UnifiedProcessor`, `ProjectPaths`, and existing download/Whisper behaviour.
+
 ## Current Directory Layout
 
 ```text
@@ -102,6 +108,9 @@ src/
   ui/
     workers/
     widgets/
+  web/
+    static/   (index.html, style.css, app.js)
+    server.py
 docs/
   ARCHITECTURE.md
 scripts/

@@ -90,9 +90,24 @@ Subtext/
   assets/          # generated files (videos/transcripts/analysis)
 ```
 
+## Web UI (same network)
+
+Run a minimal web interface so you can transcribe from your phone or another device on your home network:
+
+```bash
+uv run python run_web.py
+```
+
+- On this PC: open **http://127.0.0.1:8765**
+- From iPhone/tablet (same Wi‑Fi): open **http://\<this-PC-IP\>:8765**  
+  (Find IP: `ipconfig` on Windows, `ip addr` or System Settings on Mac/Linux.)
+
+Paste a video URL (YouTube, Instagram, X, TikTok, etc.) or upload a file, pick a Whisper model, then copy or download the transcript. Uses the same yt-dlp and Whisper setup as the desktop app.
+
 ## Useful Commands
 
 - Run app: `uv run python run.py`
+- Run web UI: `uv run python run_web.py`
 - Build exe: `uv run python scripts/build_exe.py`
 - Update deps: `uv sync --upgrade`
 - Check installed models: `ollama list`

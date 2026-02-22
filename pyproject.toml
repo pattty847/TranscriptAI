@@ -12,6 +12,9 @@ dependencies = [
     "requests",
     "aiofiles",
     "rich",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
 ]
 
 [project.optional-dependencies]

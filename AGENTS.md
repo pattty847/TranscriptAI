@@ -88,6 +88,12 @@ If something cannot be tested locally, clearly note it.
 - Prefer fallback behavior over hard failure.
 - Prefer clear status/log messages over silent retries.
 
+## Web UI
+
+- `run_web.py`: starts FastAPI (0.0.0.0:8765) for network access
+- `src/web/server.py`: API + static serving; reuses `UnifiedProcessor`
+- `src/web/static/`: single-page UI (URL, file upload, model, copy, download)
+
 ## Common Feature Entry Points
 
 - New download/transcript option:
