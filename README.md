@@ -24,14 +24,21 @@ Desktop app for downloading media, generating transcripts, and running local AI 
 
 ## Quick Start
 
+**Easiest: double-click to launch (no terminal or venv needed)**
+
+- **Windows:** double-click **Start Subtext.bat**
+- **macOS:** double-click **Start Subtext.command** (if it doesn’t run, in Terminal: `chmod +x "Start Subtext.command"`)
+
+Choose **Desktop** (full app) or **Web** (browser UI for this PC and same Wi‑Fi devices). The launcher runs `uv sync` automatically on first run.
+
+**From a terminal (optional):**
+
 ```bash
 uv sync
 uv run python run.py
+# or
+uv run python run_web.py
 ```
-
-Launch helpers:
-- Windows: double-click `win-launch.bat`
-- macOS/Linux: run `./mac-launch`
 
 ## FFmpeg Setup
 
@@ -78,6 +85,10 @@ Whisper device selection is automatic:
 
 ```text
 Subtext/
+  Start Subtext.bat      # Windows: double-click to launch (Desktop or Web)
+  Start Subtext.command  # macOS: double-click to launch (Desktop or Web)
+  run.py                 # Desktop app entry (use launcher or: uv run python run.py)
+  run_web.py             # Web UI entry (use launcher or: uv run python run_web.py)
   src/
     config/        # paths and app configuration
     core/          # downloader, transcriber, analyzer, processor
@@ -92,11 +103,7 @@ Subtext/
 
 ## Web UI (same network)
 
-Run a minimal web interface so you can transcribe from your phone or another device on your home network:
-
-```bash
-uv run python run_web.py
-```
+Double-click **Start Subtext** and choose **Web**, or run `uv run python run_web.py`. Then:
 
 - On this PC: open **http://127.0.0.1:8765**
 - From iPhone/tablet (same Wi‑Fi): open **http://\<this-PC-IP\>:8765**  
@@ -113,6 +120,8 @@ Paste a video URL (YouTube, Instagram, X, TikTok, etc.) or upload a file, pick a
 - Check installed models: `ollama list`
 
 ## Troubleshooting
+
+- **`VIRTUAL_ENV does not match` (uv warning):** You don’t need to activate the venv. Use **Start Subtext** or run `uv run python run.py` (or `run_web.py`) from the project folder; `uv` uses the correct environment automatically.
 
 - `Could not load model ...`:
   - Ensure Ollama is running and model is installed (`ollama list`)

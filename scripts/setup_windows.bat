@@ -20,5 +20,5 @@ if errorlevel 1 (
 
 echo.
 echo Setup complete.
-echo Launch with: win-launch.bat
+echo Launch with: Start Subtext.bat
 pause
